@@ -1,4 +1,4 @@
-========== Generic Data Structures ==========
+               ========== Generic Data Structures ==========
 
 Many languages have native support for type arguments, so that you can create
 a data type parameterized by another type. You can have something generic like
