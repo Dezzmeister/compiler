@@ -1,0 +1,85 @@
+========== Generic Data Structures ==========
+
+Many languages have native support for type arguments, so that you can create
+a data type parameterized by another type. You can have something generic like
+a LinkedList<T>, which can be "specialized" by substituting a concrete type for
+the argument T. You can declare types such as LinkedList<int>, LinkedList<float>,
+LinkedList<SomeStruct>, etc., with ease. For each specialized type, you get all
+the benefits of a type system because the compiler knows exactly what you're
+storing in your LinkedList - and there's almost no limit to what you can store
+in a LinkedList. 
+
+In C there is no such thing, but there are workarounds. One common workaround is
+to have a LinkedList struct where the data stored in the list has type `void*`.
+This gives you a LinkedList data type that can store a lot of things. As long
+as the thing you want to store is a pointer or something smaller, it works - but
+it doesn't always work nicely. If you want something as simple as ints in your
+LinkedList you may need to cast to (intptr_t) and then to (int) or vice versa.
+You can store a pointer to anything, but that's not always useful. Sometimes you
+just want to store the things directly so that you don't have to litter your code
+with mallocs and frees, and sometimes you just want to store primitive types which
+are a hassle when you need to convert them to void* and back. Not to mention you can
+mix things of different types in a data container of void pointers.
+
+Another way to create generic types in C is to move the type-specific code into
+one long macro with a type argument. Something like this:
+    
+    #define SPECIALIZE_LINKED_LIST(T, PREFIX) \
+        ...                     \
+        typedef struct {        \
+            ...                 \
+        } PREFIX ## LinkedList; \
+
+T in this macro is the type name of the thing we're storing, and PREFIX is a prefix
+to be prepended to type names and function names to differentiate them from other
+specialized LinkedLists. The macro is simple to use. Just put something like
+
+    SPECIALIZE_LINKED_LIST(int, Int)
+
+at the top of a file, and suddenly you have a new type called IntLinkedList that stores
+ints and nothing else. The macro might also declare some functions just for the
+IntLinkedList, like a function `Int_pushf(IntLinkedList *list, T item)` that pushes an
+item to the front of the linked list.
+
+This pattern is not bad, but it's inconvenient. It's not very good form to put a ton of
+C code in a single macro, because it makes that entire block of code harder to debug.
+Sure you can debug with the -E flag, but you'll be debugging a huge macro that gets
+stuffed into one line after preprocessing. There's also the annoying thing of having
+to end each line with a backslash. A better method might make use of macros for some
+things without disturbing the functional code (the meat of the implementation).
+
+We settled on a nice compromise between heavy macros and no macro use at all. Our
+implementation of generic data types allows you to "specialize" a generic type for
+a given type argument like this:
+
+    DECL_OPTION(T)
+    #define TYPE T
+    #define TYPED(NAME) T ## NAME
+    #include "list.h" // Generic linked list implementation
+    #undef TYPED
+    #undef TYPE
+
+After the preprocessor finishes with these 6 lines, there will be a new type called
+TLinkedList with associated functions just like in the previous method: T_ll_new(),
+T_ll_pushf(), T_ll_popf(), etc. This works because the generic implementation of 
+a LinkedList, in list.h, uses the TYPE and TYPED macros (if they're defined) throughout.
+The TYPE macro is used as a type argument to refer to objects of the generic type,
+and the TYPED macro is used to wrap names with a specific prefix to avoid naming
+collisions. 
+
+DECL_OPTION is a macro defined in lib/utils.h that defines an "optional" wrapper type for
+another type. The names of the types differ by a prefix `opt_` for the optional wrapper.
+Much like Option<T> in other languages, the option can either contain an object of the
+wrapped type or not. You need to explicitly check if it's there in most cases, and if it
+isn't, handle the error. (More details in lib/utils.h.)
+
+This setup has the advantage that the code in list.h is regular C code with some macro
+invocations sprinkled throughout, instead of one big macro. The LinkedList type might
+be defined like
+
+    typedef struct {
+        ...
+    } TYPED(LinkedList);
+
+No backslashes at the ends of every line, and this is much easier to debug than the
+second approach. 
