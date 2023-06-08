@@ -1,3 +1,6 @@
+NOTE: This was written before we learned that we didn't have to use C for the project.
+I'm keeping the repo up because these data structures might be useful.
+
                            ========== Compiler (WIP) ==========
 
 Folders:
